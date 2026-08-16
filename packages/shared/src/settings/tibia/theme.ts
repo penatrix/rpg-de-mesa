@@ -11,7 +11,7 @@ export const tibiaTheme: ThemeDef = {
     surface: '#262019',
     border: '#463a2a',
     text: '#eadfc8',
-    textMuted: '#a2907040',
+    textMuted: '#a29070',
     accent: '#d9a441',
     accentSoft: '#8a6a2a',
     danger: '#c0392b',
