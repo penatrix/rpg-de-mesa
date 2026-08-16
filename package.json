@@ -2,14 +2,14 @@
   "name": "rpg-de-mesa",
   "private": true,
   "version": "0.1.0",
-  "description": "Plataforma de RPG de mesa com múltiplas ambientações, dados e fichas in-game, single/multiplayer e Mestre humano ou IA.",
+  "description": "Plataforma de RPG de mesa com m\u00faltiplas ambienta\u00e7\u00f5es, dados e fichas in-game, single/multiplayer e Mestre humano ou IA.",
   "workspaces": [
     "packages/shared",
     "packages/server",
     "packages/client"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=20 <25"
   },
   "scripts": {
     "build": "npm run build -w @rpg/shared && npm run build -w @rpg/server && npm run build -w @rpg/client",

@@ -217,8 +217,14 @@ O que o serviço precisa oferecer:
 | Sintoma | Causa |
 |---|---|
 | `Cannot find module '@rpg/shared'` | Rode `npm run build -w @rpg/shared`. O `npm install` e o `npm run dev` já fazem isso automaticamente. |
-| `better-sqlite3` falha ao instalar | Node abaixo de 20, ou falta toolchain de build. `node -v` para conferir. |
+| `better-sqlite3` falha ao compilar, com erros de `v8::Object` e `No prebuilt binaries found` | Node nova demais. O `better-sqlite3` publica binários prontos até certa versão; acima disso ele tenta compilar contra uma API do V8 que mudou, e falha. Use a Node 22 — há um `.node-version` no repositório, e em hospedagem defina `NODE_VERSION=22`. |
+| `better-sqlite3` falha ao instalar por outro motivo | Node abaixo de 20, ou falta toolchain de build. `node -v` para conferir. |
 | Porta 5173 ou 8787 ocupada | `PORT=9000 npm run dev` muda a do servidor; a do cliente fica em `packages/client/vite.config.ts`. |
+
+> A versão da Node é **fixada de propósito**. Uma faixa aberta como `>=20` faz
+> plataformas de deploy escolherem a mais nova disponível, que pode ser mais
+> nova do que as dependências nativas suportam — foi exatamente assim que um
+> deploy quebrou ao resolver para a Node 26.
 
 ---
 
