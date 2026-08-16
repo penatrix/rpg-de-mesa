@@ -23,8 +23,29 @@ cd rpg-de-mesa
 npm install
 ```
 
+O `git clone` cria a pasta `rpg-de-mesa` **dentro do diretório em que o
+terminal estava**. Ao abrir um terminal novo, isso é a sua pasta pessoal — ou
+seja, quase sempre:
+
+| Sistema | Caminho |
+|---|---|
+| Windows | `C:\Users\SeuNome\rpg-de-mesa` |
+| macOS | `/Users/SeuNome/rpg-de-mesa` |
+| Linux | `/home/seunome/rpg-de-mesa` |
+
+Perdeu de vista? `pwd` (ou `cd` no Windows) mostra onde você está agora. Para
+procurar a pasta:
+
+```bash
+# macOS / Linux
+find ~ -maxdepth 3 -type d -name rpg-de-mesa 2>/dev/null
+
+# Windows PowerShell
+Get-ChildItem $HOME -Filter rpg-de-mesa -Recurse -Depth 3 -Directory -ErrorAction SilentlyContinue
+```
+
 O `npm install` demora um pouco na primeira vez e termina imprimindo um resumo
-com o que falta configurar.
+com o que falta configurar — incluindo o **caminho absoluto** do arquivo `.env`.
 
 ### Passo 2 — rode
 
@@ -46,13 +67,26 @@ de verdade, que narra, rola dados e controla as criaturas:
 1. Entre em [console.anthropic.com](https://console.anthropic.com) e crie a conta
 2. Em **Billing**, adicione créditos (o uso é cobrado por token)
 3. Em **API Keys**, clique em **Create Key** e copie o valor
-4. Abra o arquivo `.env` na raiz do projeto e cole depois do igual:
+4. Abra o arquivo `.env` — ele fica na raiz do projeto, ao lado do
+   `package.json`. Como o nome começa com ponto, o Finder e o Explorer o
+   **escondem**; o jeito mais simples é abrir pelo terminal, de dentro da pasta
+   do projeto:
+
+```bash
+nano .env        # macOS / Linux  (salvar: Ctrl+O, Enter; sair: Ctrl+X)
+notepad .env     # Windows
+```
+
+5. Cole a chave depois do sinal de igual, sem aspas e sem espaços:
 
 ```
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-5. Pare o servidor (`Ctrl+C`) e rode `npm run dev` de novo
+6. Pare o servidor (`Ctrl+C`) e rode `npm run dev` de novo
+
+> Se `.env` não existir, é porque o `npm install` ainda não rodou nesta pasta.
+> Rode `npm run setup` — ele cria o arquivo e imprime o caminho completo dele.
 
 A chave aparece **uma única vez** na tela — se perder, crie outra. O `.env`
 nunca é enviado ao repositório, e a chave não deve ser compartilhada com

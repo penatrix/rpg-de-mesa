@@ -65,11 +65,22 @@ if (hasKey) {
   console.log(`    1. Entre em ${bold('https://console.anthropic.com')} e crie uma conta`);
   console.log(`    2. Adicione créditos em ${bold('Billing')} (o uso é cobrado por token)`);
   console.log(`    3. Vá em ${bold('API Keys')} → ${bold('Create Key')} e copie a chave`);
-  console.log(`    4. Abra o arquivo ${bold('.env')} na raiz do projeto e cole depois do sinal de igual:`);
-  console.log(`       ${bold('ANTHROPIC_API_KEY=cole-aqui')}`);
+  console.log(`    4. Cole a chave depois do sinal de igual neste arquivo:`);
+  console.log();
+  // Caminho absoluto porque "na raiz do projeto" não ajuda quem não sabe onde
+  // o projeto foi parar — e porque o .env começa com ponto, então o Finder e o
+  // Explorer o escondem por padrão.
+  console.log(`       ${bold(envPath)}`);
+  console.log();
+  console.log(`       O arquivo começa com ponto, então o Finder (macOS) e o`);
+  console.log(`       Explorer (Windows) o escondem. Abra-o direto pelo terminal:`);
+  console.log();
+  console.log(`         macOS/Linux:  ${bold(`nano "${envPath}"`)}`);
+  console.log(`         Windows:      ${bold(`notepad "${envPath}"`)}`);
   console.log();
   console.log(`  A chave aparece uma única vez — se perder, crie outra.`);
-  console.log(`  O arquivo .env nunca vai para o repositório; não compartilhe a chave com ninguém.`);
+  console.log(`  Este arquivo nunca vai para o repositório; não compartilhe a chave com ninguém.`);
+  console.log(`  Publicando no Render? A chave vai no painel de lá, não neste arquivo.`);
 }
 
 console.log();
