@@ -1,0 +1,44 @@
+# Blueprint do Render. Com este arquivo no repositório, publicar é apontar o
+# Render para o repo e confirmar — sem preencher formulário de build.
+#
+# Render foi escolhido como padrão porque atende os três requisitos que o
+# Vercel e o GitHub Pages não atendem: processo Node de vida longa, WebSocket
+# nativo e disco para o SQLite.
+
+services:
+  - type: web
+    name: rpg-de-mesa
+    runtime: node
+    plan: free
+    region: oregon
+
+    # --include=dev não é opcional: plataformas de deploy definem
+    # NODE_ENV=production, e nesse modo o npm pula as devDependencies — onde
+    # vivem o TypeScript e o Vite. Sem a flag, o build falha com "tsc: not found".
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+
+    healthCheckPath: /api/health
+
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+
+      # sync: false faz o Render pedir o valor no painel em vez de guardá-lo
+      # aqui. Chave de API nunca entra em arquivo versionado.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+
+      # O plano gratuito não oferece disco persistente, então o SQLite vive em
+      # /tmp e some a cada reinício. As mesas continuam em memória durante o
+      # jogo; o que se perde é o histórico entre reinícios.
+      #
+      # Para campanhas contínuas, troque plan para "starter", descomente o
+      # bloco disk abaixo e aponte RPG_DB_PATH para /app/data/rpg.db.
+      - key: RPG_DB_PATH
+        value: /tmp/rpg.db
+
+    # disk:
+    #   name: rpg-data
+    #   mountPath: /app/data
+    #   sizeGB: 1

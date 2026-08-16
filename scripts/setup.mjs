@@ -13,6 +13,12 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
+// Em servidor de hospedagem não há ninguém lendo o terminal, e as variáveis
+// vêm do painel — criar um .env ali só polui o log. Sai quieto.
+if (process.env.CI || process.env.NODE_ENV === 'production' || process.env.RENDER) {
+  process.exit(0);
+}
+
 const bold = (text) => `[1m${text}[0m`;
 const green = (text) => `[32m${text}[0m`;
 const yellow = (text) => `[33m${text}[0m`;

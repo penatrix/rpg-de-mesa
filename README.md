@@ -104,9 +104,48 @@ grupo. Funciona porque tudo — página, API e WebSocket — vive na mesma porta
 A URL morre quando você fecha o terminal, e a mesa roda na sua máquina: se você
 desligar, a sessão acaba. Para uma campanha contínua, veja o próximo item.
 
-### 3. Publicado de verdade (contêiner)
+### 3. Publicado de verdade
 
-Há um `Dockerfile` pronto. A imagem final serve tudo numa porta só:
+#### Vercel e GitHub Pages não servem
+
+Não é questão de configuração — é incompatibilidade de arquitetura, e vale
+entender por quê antes de perder tempo tentando:
+
+| | O que oferece | O que esta plataforma precisa |
+|---|---|---|
+| **GitHub Pages** | Só arquivos estáticos | Um processo Node rodando |
+| **Vercel** | Funções que sobem, respondem e morrem | Um processo que fica **vivo** entre as jogadas |
+
+O jogo inteiro acontece sobre uma conexão WebSocket permanente: quando o Mestre
+aplica dano, o servidor empurra a mudança para os seis navegadores na hora.
+Função serverless não mantém conexão aberta, e o disco dela é descartado a cada
+invocação — o SQLite não teria onde morar. Um front-end estático no Vercel
+ainda precisaria de um servidor em outro lugar, o que é mais trabalho, não menos.
+
+#### Render (recomendado)
+
+Tem plano gratuito, WebSocket nativo e um `render.yaml` já no repositório:
+
+1. Entre em [render.com](https://render.com) e conecte sua conta do GitHub
+2. **New** → **Blueprint** → escolha o repositório `rpg-de-mesa`
+3. O Render lê o `render.yaml` sozinho e pede uma coisa só: o valor de
+   `ANTHROPIC_API_KEY`. Cole ali — é o painel do Render, não um arquivo do repo
+4. **Apply**. O primeiro build leva alguns minutos
+
+No fim você recebe uma URL `https://rpg-de-mesa.onrender.com`. Manda no grupo.
+
+Duas características do plano gratuito, para não te pegarem de surpresa:
+
+- **Dorme após ~15 minutos parado.** O primeiro acesso depois disso demora uns
+  50 segundos para acordar. Durante a sessão, com gente jogando, fica de pé.
+- **Sem disco persistente**, então o SQLite mora em `/tmp` e o histórico some a
+  cada reinício. As mesas seguem em memória enquanto se joga; o que se perde é
+  a campanha entre reinícios. Para resolver, mude `plan` para `starter` no
+  `render.yaml` e descomente o bloco `disk`.
+
+#### Outras plataformas
+
+Railway, Fly.io, Koyeb ou qualquer VPS servem igual. Há um `Dockerfile` pronto:
 
 ```bash
 docker build -t rpg-de-mesa .
@@ -116,17 +155,24 @@ docker run -p 8787:8787 \
   rpg-de-mesa
 ```
 
-Isso sobe igual em Render, Railway, Fly.io ou qualquer VPS. O que o serviço
-precisa oferecer:
+Se preferir build nativo em vez de contêiner, use exatamente estes comandos:
+
+```
+build:  npm install --include=dev && npm run build
+start:  npm start
+```
+
+O `--include=dev` **não é opcional**: plataformas de deploy definem
+`NODE_ENV=production`, e nesse modo o npm pula as devDependencies — onde vivem
+o TypeScript e o Vite. Sem a flag o build falha com `tsc: not found`.
+
+O que o serviço precisa oferecer:
 
 | Requisito | Por quê |
 |---|---|
 | **WebSocket** | O jogo inteiro roda por Socket.IO. Sem isso, nada funciona. |
-| **Disco persistente** em `/app/data` | As mesas ficam em SQLite. Sem volume, cada redeploy zera tudo. |
-| `PORT` respeitado | O servidor lê a variável; a maioria das plataformas a injeta. |
-
-Variáveis a configurar no painel: `ANTHROPIC_API_KEY` (para o Mestre IA) e,
-se a plataforma não montar o volume no caminho padrão, `RPG_DB_PATH`.
+| `PORT` respeitado | O servidor lê a variável; a maioria das plataformas injeta. |
+| **Disco persistente** (desejável) | Sem volume, o histórico some a cada redeploy. |
 
 > **Não há autenticação.** Quem tiver a URL pode criar mesas, e quem tiver o
 > código de 6 caracteres entra na sua. Para um grupo de amigos isso basta; para
