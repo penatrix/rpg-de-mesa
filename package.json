@@ -1,0 +1,29 @@
+{
+  "name": "rpg-de-mesa",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Plataforma de RPG de mesa com múltiplas ambientações, dados e fichas in-game, single/multiplayer e Mestre humano ou IA.",
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/client"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build -w @rpg/shared && npm run build -w @rpg/server && npm run build -w @rpg/client",
+    "postinstall": "npm run build -w @rpg/shared",
+    "predev": "npm run build -w @rpg/shared",
+    "dev": "concurrently -n server,client -c cyan,magenta \"npm run dev -w @rpg/server\" \"npm run dev -w @rpg/client\"",
+    "dev:server": "npm run dev -w @rpg/server",
+    "dev:client": "npm run dev -w @rpg/client",
+    "start": "npm run start -w @rpg/server",
+    "test": "npm run test -w @rpg/shared",
+    "typecheck": "tsc -b packages/shared packages/server packages/client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.7.2"
+  }
+}

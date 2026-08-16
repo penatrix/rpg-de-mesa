@@ -1,8 +1,21 @@
+# Padrões sem barra no meio casam em qualquer profundidade. Os antigos
+# ("data/*.db", "dist/") estavam ancorados na raiz e deixavam passar
+# packages/server/data/rpg.db e packages/client/dist-types/.
 node_modules/
+
+# Saída de build
 dist/
+dist-types/
 *.tsbuildinfo
+
+# Banco de dados local
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Ambiente
 .env
 .env.local
-data/*.db
-data/*.db-journal
+
 .DS_Store
