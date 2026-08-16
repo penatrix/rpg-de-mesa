@@ -13,6 +13,8 @@
   },
   "scripts": {
     "build": "npm run build -w @rpg/shared && npm run build -w @rpg/server && npm run build -w @rpg/client",
+    "postinstall": "npm run build -w @rpg/shared",
+    "predev": "npm run build -w @rpg/shared",
     "dev": "concurrently -n server,client -c cyan,magenta \"npm run dev -w @rpg/server\" \"npm run dev -w @rpg/client\"",
     "dev:server": "npm run dev -w @rpg/server",
     "dev:client": "npm run dev -w @rpg/client",

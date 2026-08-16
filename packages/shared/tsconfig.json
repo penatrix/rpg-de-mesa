@@ -2,7 +2,10 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "./src",
-    "outDir": "./dist"
+    "outDir": "./dist",
+    // Dentro do dist de propósito: apagar o dist invalida o cache do build.
+    // Fora dele, `tsc -b` acha que está tudo pronto e não emite nada.
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
   "include": ["src/**/*"]
 }

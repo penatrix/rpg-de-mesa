@@ -3,15 +3,40 @@
 Plataforma de RPG de mesa com múltiplas ambientações, dados e fichas in-game,
 single e multiplayer até 6 jogadores, e um Mestre que pode ser humano ou IA.
 
+## Rodando na sua máquina
+
+Requer **Node 20 ou superior**.
+
 ```bash
+git clone https://github.com/penatrix/rpg-de-mesa.git
+cd rpg-de-mesa
 npm install
-npm run build
-npm run dev          # servidor em :8787, cliente em :5173
+npm run dev
 ```
 
-Abra `http://localhost:5173`. Sem nenhuma configuração a plataforma já roda —
-com o Mestre Offline. Para habilitar o Mestre IA, copie `.env.example` para
-`.env` e preencha `ANTHROPIC_API_KEY`.
+Abra **http://localhost:5173**.
+
+Sem nenhuma configuração a plataforma já roda — com o Mestre Offline. Para
+habilitar o Mestre IA, copie `.env.example` para `.env` e preencha
+`ANTHROPIC_API_KEY`.
+
+Para jogar em rede local, os outros jogadores acessam
+`http://SEU-IP:5173` e entram com o código da mesa.
+
+### Modo produção (uma porta só)
+
+```bash
+npm run build
+npm start            # tudo em http://localhost:8787
+```
+
+### Se algo não subir
+
+| Sintoma | Causa |
+|---|---|
+| `Cannot find module '@rpg/shared'` | Rode `npm run build -w @rpg/shared`. O `npm install` e o `npm run dev` já fazem isso automaticamente. |
+| `better-sqlite3` falha ao instalar | Node abaixo de 20, ou falta toolchain de build. `node -v` para conferir. |
+| Porta 5173 ou 8787 ocupada | `PORT=9000 npm run dev` muda a do servidor; a do cliente fica em `packages/client/vite.config.ts`. |
 
 ---
 
