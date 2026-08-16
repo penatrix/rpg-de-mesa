@@ -3,22 +3,63 @@
 Plataforma de RPG de mesa com múltiplas ambientações, dados e fichas in-game,
 single e multiplayer até 6 jogadores, e um Mestre que pode ser humano ou IA.
 
-## Rodando na sua máquina
+## Rodando pela primeira vez
 
-Requer **Node 20 ou superior**.
+### Passo 0 — instale o Node
+
+Se `node -v` no terminal não responder `v20` ou maior, baixe a versão **LTS**
+em [nodejs.org](https://nodejs.org) e instale.
+
+> **Onde é o terminal?** Windows: procure por `PowerShell` no menu iniciar.
+> macOS: `Terminal`, na pasta Utilitários. Linux: você já sabe.
+
+### Passo 1 — baixe e instale
+
+Um comando de cada vez:
 
 ```bash
 git clone https://github.com/penatrix/rpg-de-mesa.git
 cd rpg-de-mesa
 npm install
+```
+
+O `npm install` demora um pouco na primeira vez e termina imprimindo um resumo
+com o que falta configurar.
+
+### Passo 2 — rode
+
+```bash
 npm run dev
 ```
 
-Abra **http://localhost:5173**.
+Quando aparecer `RPG de Mesa — servidor em http://localhost:8787`, abra
+**http://localhost:5173** no navegador. Para parar, `Ctrl+C` no terminal.
 
-Sem nenhuma configuração a plataforma já roda — com o Mestre Offline. Para
-habilitar o Mestre IA, copie `.env.example` para `.env` e preencha
-`ANTHROPIC_API_KEY`.
+Já dá para jogar assim: escolha Tibia, dê um nome, crie a mesa e o personagem.
+
+### Passo 3 (opcional) — ligue o Mestre IA
+
+Sem chave você joga com o **Mestre Offline**, que só puxa ganchos prontos da
+ambientação — serve para testar, mas não conduz uma história. Para ter o Mestre
+de verdade, que narra, rola dados e controla as criaturas:
+
+1. Entre em [console.anthropic.com](https://console.anthropic.com) e crie a conta
+2. Em **Billing**, adicione créditos (o uso é cobrado por token)
+3. Em **API Keys**, clique em **Create Key** e copie o valor
+4. Abra o arquivo `.env` na raiz do projeto e cole depois do igual:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+5. Pare o servidor (`Ctrl+C`) e rode `npm run dev` de novo
+
+A chave aparece **uma única vez** na tela — se perder, crie outra. O `.env`
+nunca é enviado ao repositório, e a chave não deve ser compartilhada com
+ninguém, nem colada em conversas.
+
+Para conferir se pegou, rode `npm run setup` — ele diz se a chave está lá sem
+nunca mostrá-la.
 
 ### Modo produção (uma porta só)
 
