@@ -18,7 +18,7 @@
     "dev": "concurrently -n server,client -c cyan,magenta \"npm run dev -w @rpg/server\" \"npm run dev -w @rpg/client\"",
     "dev:server": "npm run dev -w @rpg/server",
     "dev:client": "npm run dev -w @rpg/client",
-    "start": "npm run start -w @rpg/server",
+    "start": "node packages/server/dist/index.js",
     "test": "npm run test -w @rpg/shared",
     "typecheck": "tsc -b packages/shared packages/server packages/client"
   },

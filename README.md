@@ -20,15 +20,76 @@ Sem nenhuma configuração a plataforma já roda — com o Mestre Offline. Para
 habilitar o Mestre IA, copie `.env.example` para `.env` e preencha
 `ANTHROPIC_API_KEY`.
 
-Para jogar em rede local, os outros jogadores acessam
-`http://SEU-IP:5173` e entram com o código da mesa.
-
 ### Modo produção (uma porta só)
 
 ```bash
 npm run build
-npm start            # tudo em http://localhost:8787
+npm start            # API, WebSocket e cliente em http://localhost:8787
 ```
+
+---
+
+## Jogar com outras pessoas
+
+Três caminhos, do mais rápido ao mais permanente.
+
+### 1. Mesma rede (casa, escritório)
+
+Suba com `npm run dev` e descubra seu IP local:
+
+```bash
+hostname -I | awk '{print $1}'      # Linux
+ipconfig getifaddr en0              # macOS
+```
+
+Os outros acessam `http://SEU-IP:5173` e entram com o código da mesa. O
+servidor de desenvolvimento já escuta em todas as interfaces.
+
+### 2. Internet agora, sem publicar nada (túnel)
+
+O caminho mais rápido para jogar hoje à noite. Suba em modo produção e exponha
+a porta com um túnel:
+
+```bash
+npm run build && npm start
+
+# noutro terminal — sem cadastro, sem instalação permanente:
+npx cloudflared tunnel --url http://localhost:8787
+```
+
+Ele imprime uma URL `https://algo-aleatorio.trycloudflare.com`. Mande para o
+grupo. Funciona porque tudo — página, API e WebSocket — vive na mesma porta.
+
+A URL morre quando você fecha o terminal, e a mesa roda na sua máquina: se você
+desligar, a sessão acaba. Para uma campanha contínua, veja o próximo item.
+
+### 3. Publicado de verdade (contêiner)
+
+Há um `Dockerfile` pronto. A imagem final serve tudo numa porta só:
+
+```bash
+docker build -t rpg-de-mesa .
+docker run -p 8787:8787 \
+  -e ANTHROPIC_API_KEY=sk-ant-... \
+  -v rpg-data:/app/data \
+  rpg-de-mesa
+```
+
+Isso sobe igual em Render, Railway, Fly.io ou qualquer VPS. O que o serviço
+precisa oferecer:
+
+| Requisito | Por quê |
+|---|---|
+| **WebSocket** | O jogo inteiro roda por Socket.IO. Sem isso, nada funciona. |
+| **Disco persistente** em `/app/data` | As mesas ficam em SQLite. Sem volume, cada redeploy zera tudo. |
+| `PORT` respeitado | O servidor lê a variável; a maioria das plataformas a injeta. |
+
+Variáveis a configurar no painel: `ANTHROPIC_API_KEY` (para o Mestre IA) e,
+se a plataforma não montar o volume no caminho padrão, `RPG_DB_PATH`.
+
+> **Não há autenticação.** Quem tiver a URL pode criar mesas, e quem tiver o
+> código de 6 caracteres entra na sua. Para um grupo de amigos isso basta; para
+> algo exposto e duradouro, ponha atrás de um proxy com senha.
 
 ### Se algo não subir
 

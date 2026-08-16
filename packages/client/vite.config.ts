@@ -7,6 +7,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    // Escuta em todas as interfaces, não só em localhost: sem isso ninguém na
+    // rede local consegue entrar na sua mesa.
+    host: true,
     // O cliente fala com o servidor pelo mesmo host em produção; em
     // desenvolvimento o proxy evita configurar CORS e URLs em dois lugares.
     proxy: {
