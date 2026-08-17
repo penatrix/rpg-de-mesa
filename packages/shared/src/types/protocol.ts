@@ -60,6 +60,17 @@ export interface CheckPayload {
   secret?: boolean;
 }
 
+/** Resolve um teste que o Mestre pediu — a rolagem é do jogador. */
+export interface ResolveCheckPayload {
+  tableId: TableId;
+  checkId: string;
+}
+
+/** Recruta ou dispensa um companheiro NPC. */
+export type CompanionPayload =
+  | { tableId: TableId; action: 'add'; companionId: string }
+  | { tableId: TableId; action: 'remove'; participantId: PlayerId };
+
 export interface SayPayload {
   tableId: TableId;
   text: string;
@@ -108,6 +119,12 @@ export interface ClientToServerEvents {
 
   'dice:roll': (payload: RollPayload, ack: (result: Result<{ roll: DiceRoll }>) => void) => void;
   'dice:check': (payload: CheckPayload, ack: (result: Result<{ roll: DiceRoll }>) => void) => void;
+  'dice:resolve-check': (
+    payload: ResolveCheckPayload,
+    ack: (result: Result<{ roll: DiceRoll }>) => void,
+  ) => void;
+
+  'table:companion': (payload: CompanionPayload, ack: (result: Result<null>) => void) => void;
 
   'chat:say': (payload: SayPayload) => void;
 

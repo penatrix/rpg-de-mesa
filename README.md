@@ -62,7 +62,7 @@ Já dá para jogar assim: escolha Tibia, dê um nome, crie a mesa e o personagem
 
 Sem chave você joga com o **Mestre Offline**, que só puxa ganchos prontos da
 ambientação — serve para testar, mas não conduz uma história. Para ter o Mestre
-de verdade, que narra, rola dados e controla as criaturas:
+de verdade, que narra, pede os testes e controla as criaturas:
 
 1. Entre em [console.anthropic.com](https://console.anthropic.com) e crie a conta
 2. Em **Billing**, adicione créditos (o uso é cobrado por token)
@@ -94,6 +94,12 @@ ninguém, nem colada em conversas.
 
 Para conferir se pegou, rode `npm run setup` — ele diz se a chave está lá sem
 nunca mostrá-la.
+
+**Quanto isso custa.** O Mestre IA é cobrado por token. Os padrões da
+plataforma (Sonnet, esforço baixo, cache em dois pontos, teto de saída curto)
+foram escolhidos para uma sessão custar centavos, e cada mesa tem um **teto de
+US$ 1,00** que a interrompe antes de virar surpresa. O gasto aparece ao vivo no
+cabeçalho da mesa. Detalhes e como ajustar: [Quanto custa uma mesa](#quanto-custa-uma-mesa).
 
 ### Modo produção (uma porta só)
 
@@ -299,17 +305,53 @@ erro para o modelo corrigir, não corrompe o estado.
 A narração chega em streaming: a entrada de log nasce vazia e cresce por deltas,
 então a mesa vê o texto aparecer em vez de esperar o turno inteiro.
 
+**O Mestre pede o dado; quem rola é o jogador.** `request_check` não devolve
+resultado nenhum ao modelo: cria um pedido pendente, o turno acaba ali, e a
+mesa fica esperando alguém clicar. É a rolagem do jogador que reabre o turno,
+com o resultado em mãos, para o Mestre narrar a consequência. Um Mestre que
+pede *e* resolve transforma a mesa em texto que acontece com você.
+
+### Quanto custa uma mesa
+
+O executor de ferramentas faz **uma chamada à API por ferramenta usada** — um
+combate com invocação, iniciativa, três danos e narração são seis idas e voltas
+por ação declarada. Sem cuidado, isso custa dólares por sessão. As decisões que
+seguram a conta:
+
+| Decisão | Por quê |
+|---|---|
+| Sonnet como padrão, não Opus | neste regime de muitas chamadas curtas, a diferença de narrativa não paga a diferença de preço |
+| Esforço `low`, pensamento estendido desligado | narrar três frases e aplicar dano não é problema de raciocínio, e o pensamento é cobrado como saída |
+| `max_tokens` de 1600 | uma narração de mesa tem 2 a 6 frases; teto alto só remove o freio |
+| Dois pontos de cache | o prefixo (ferramentas + cânone + catálogos) e o contexto do turno; sem o segundo, um turno de seis ferramentas reenviaria o contexto seis vezes a preço cheio |
+| 10 entradas de log por turno | a memória longa é a crônica, que custa uma fração de reenviar o histórico |
+| Teto por mesa | ao atingi-lo o Mestre IA para e a mesa segue com Mestre humano — mesa esquecida aberta não vira conta aberta |
+
+O consumo aparece **na própria mesa**, no cabeçalho: dólares gastos, teto, e no
+detalhe o quanto veio de cache. Uma conta que só aparece na fatura do fim do mês
+é uma conta que ninguém controla.
+
 O prompt é dividido em duas partes por um motivo específico:
 
-- **prefixo estável por ambientação** (cânone, regras, catálogos) — vai no
-  `system` com `cache_control`, então o custo é pago uma vez e não por turno;
+- **prefixo estável por ambientação** (cânone, regras, catálogos, campanha) —
+  vai no `system` com `cache_control`, então o custo é pago uma vez e não por
+  turno;
 - **contexto volátil do turno** (cena, fichas, combate, log recente) — vai
-  depois, na mensagem do usuário.
+  depois, na mensagem do usuário, com o seu próprio ponto de cache para as
+  iterações seguintes do mesmo turno.
 
 Inverter essa ordem invalidaria o cache a cada rolagem de dado.
 
 Como o histórico de mensagens é truncado, o Mestre mantém uma **crônica da
 campanha** via ferramenta — a memória de longo prazo que sobrevive ao corte.
+
+### Companheiros custam zero a mais
+
+Um grupo de quatro custa o mesmo que jogar sozinho: os companheiros são NPCs
+que o **próprio Mestre interpreta**, dentro do turno que já ia acontecer. Não há
+uma segunda IA nem uma segunda chamada — há personalidade no prompt (que é
+cacheado) e uma ficha na mesa, que entra na iniciativa e toma dano como
+qualquer outra.
 
 ### Permissões são do servidor
 
@@ -327,6 +369,14 @@ Cada faixa é uma escala, uma progressão de acordes e um timbre, sintetizados n
 navegador com Web Audio. Zero downloads, zero licenças, zero megabytes — e
 "uma trilha por ambientação" passa a ser viável. O Mestre troca a faixa e todos
 na mesa ouvem a mudança.
+
+O que faz soar medieval e não como um sintetizador dos anos 80, em ordem de
+importância: um **bordão** de quinta aberta segurando o compasso (o som da gaita
+de foles e da sanfona de roda); **corda dedilhada** com ataque instantâneo e
+duas ondas levemente desafinadas, que é o que separa alaúde de órgão;
+**reverberação de sala** por uma resposta ao impulso gerada em tempo de
+execução; e uma **melodia modal** por cima, tirada da própria escala da faixa.
+Faixas de combate e triunfo ganham tambor de moldura.
 
 ---
 
@@ -348,6 +398,15 @@ A ambientação completa. O que está modelado:
   entrega sem autorização explícita.
 - **Cânone** dos deuses (Fafnar, Uman, Zathroth, Banor, Crunor, Suon, Fardos),
   da morte e do templo, e da reivindicação minotaura.
+- **Campanha "A Corda que Desce"** — prólogo lido na abertura da mesa (sem
+  custo de API, é texto da ambientação) e quatro atos que dão rumo de longo
+  prazo ao Mestre, de Rookgaard a Ferumbras.
+- **Quatro companheiros** recrutáveis, com voz própria e ficha de verdade.
+
+A ficha traz um **boneco de equipamento** com um slot por parte do corpo e a
+mochila em grade, do jeito que RPG de tela desenha. Os ícones são desenhados em
+SVG a partir do id e da raridade do item — a arte de Tibia é da CipSoft e não
+nos pertence, então a plataforma desenha a sua.
 
 Horror Cósmico e O Aro Exterior estão marcados como **preview**: tema, regras e
 modelo de personagem completos e jogáveis, catálogos ainda enxutos.
@@ -359,8 +418,14 @@ modelo de personagem completos e jogáveis, catálogos ainda enxutos.
 | Variável | Padrão | Para quê |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | — | Habilita o Mestre IA. Sem ela, Mestre Offline. |
-| `RPG_GM_MODEL` | `claude-opus-5` | Modelo do Mestre. |
-| `RPG_GM_EFFORT` | `medium` | `low`…`max`. Numa mesa, latência é qualidade. |
+| `RPG_GM_MODEL` | `claude-sonnet-5` | Modelo do Mestre. Opus custa bem mais neste regime. |
+| `RPG_GM_EFFORT` | `low` | `low`…`max`. Sobe a qualidade e o custo de saída. |
+| `RPG_GM_THINKING` | `0` | `1` liga o pensamento estendido. |
+| `RPG_GM_MAX_TOKENS` | `1600` | Teto de saída por chamada. |
+| `RPG_GM_MAX_ITERATIONS` | `8` | Ferramentas encadeadas por turno. |
+| `RPG_GM_LOG_WINDOW` | `10` | Entradas de log enviadas ao Mestre por turno. |
+| `RPG_TABLE_BUDGET_CENTS` | `100` | Teto de gasto por mesa, em centavos. `0` desliga. |
+| `RPG_PRICE_*` | tabela embutida | Preços por milhão de tokens, só para a estimativa exibida. |
 | `PORT` | `8787` | Porta do servidor. |
 | `RPG_DB_PATH` | `./data/rpg.db` | Banco SQLite. |
 
@@ -369,7 +434,7 @@ modelo de personagem completos e jogáveis, catálogos ainda enxutos.
 ## Desenvolvimento
 
 ```bash
-npm test           # 52 testes: motor de dados, regras e integridade dos catálogos
+npm test           # 82 testes: motor de dados, regras e integridade dos catálogos
 npm run typecheck  # os três pacotes
 npm run build      # tudo; o servidor passa a servir o cliente compilado
 npm start          # produção, uma porta só

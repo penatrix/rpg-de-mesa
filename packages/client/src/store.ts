@@ -103,6 +103,11 @@ interface State {
     secret?: boolean;
   }): Promise<void>;
 
+  /** Rola um teste que o Mestre pediu. É esta a rolagem que é sua. */
+  resolveCheck(checkId: string): Promise<void>;
+  addCompanion(companionId: string): Promise<void>;
+  removeCompanion(participantId: string): Promise<void>;
+
   say(text: string, kind: 'speech' | 'ooc'): void;
   askGm(prompt: string): Promise<void>;
   gmAction(payload: Record<string, unknown>): Promise<void>;
@@ -345,6 +350,40 @@ export const useStore = create<State>((set, get) => ({
       await request(socket, 'dice:check', { tableId: table.id, ...input });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Teste inválido.' });
+    }
+  },
+
+  async resolveCheck(checkId) {
+    const { socket, table } = get();
+    if (!socket || !table) return;
+    try {
+      await request(socket, 'dice:resolve-check', { tableId: table.id, checkId });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Não foi possível rolar.' });
+    }
+  },
+
+  async addCompanion(companionId) {
+    const { socket, table } = get();
+    if (!socket || !table) return;
+    try {
+      await request(socket, 'table:companion', { tableId: table.id, action: 'add', companionId });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Não foi possível recrutar.' });
+    }
+  },
+
+  async removeCompanion(participantId) {
+    const { socket, table } = get();
+    if (!socket || !table) return;
+    try {
+      await request(socket, 'table:companion', {
+        tableId: table.id,
+        action: 'remove',
+        participantId,
+      });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Não foi possível dispensar.' });
     }
   },
 

@@ -86,10 +86,55 @@ export type ItemSlot =
   | 'consumable'
   | 'misc';
 
+/**
+ * Silhuetas que o cliente sabe desenhar em SVG.
+ *
+ * A arte não vem de arquivo: o ícone é vetor desenhado no navegador a partir
+ * desta descrição. Além de não custar download, evita usar sprites de jogos
+ * comerciais — a arte de Tibia é da CipSoft e não nos pertence.
+ */
+export type ItemShape =
+  | 'sword'
+  | 'axe'
+  | 'club'
+  | 'hammer'
+  | 'spear'
+  | 'bow'
+  | 'crossbow'
+  | 'arrow'
+  | 'wand'
+  | 'rod'
+  | 'shield'
+  | 'helmet'
+  | 'armor'
+  | 'legs'
+  | 'boots'
+  | 'ring'
+  | 'amulet'
+  | 'potion'
+  | 'food'
+  | 'coin'
+  | 'rope'
+  | 'shovel'
+  | 'scale'
+  | 'bag';
+
+export interface ItemIcon {
+  shape: ItemShape;
+  /** Cor principal da peça. */
+  tint: string;
+  /** Cor do detalhe (cabo, fivela, líquido). */
+  accent?: string;
+  /** Brilho ao redor, para itens mágicos. */
+  glow?: string;
+}
+
 export interface ItemDef {
   id: string;
   name: string;
   slot: ItemSlot;
+  /** Ícone desenhado na ficha. Quando ausente, é deduzido do id e do slot. */
+  icon?: ItemIcon;
   description: string;
   /** Peso em unidades de capacidade da ambientação. */
   weight: number;
@@ -260,6 +305,52 @@ export interface GameMasterPersona {
 }
 
 // ---------------------------------------------------------------------------
+// Campanha e companheiros
+// ---------------------------------------------------------------------------
+
+/**
+ * A campanha padrão da ambientação.
+ *
+ * Existe para que a mesa comece com *contexto* em vez de um parágrafo solto: o
+ * prólogo é lido na abertura, a premissa entra no prompt do Mestre e os atos
+ * dão à IA um rumo de longo prazo em vez de improviso a cada turno. Nada disso
+ * custa chamada de API — é texto da ambientação.
+ */
+export interface CampaignDef {
+  title: string;
+  /** Uma frase: o que está em jogo. */
+  premise: string;
+  /** Lido na abertura da mesa, parágrafo a parágrafo. */
+  prologue: string[];
+  /** Rumo de longo prazo. O Mestre avança conforme o grupo sobe de nível. */
+  acts: {
+    id: string;
+    title: string;
+    goal: string;
+    /** Faixa de níveis em que este ato faz sentido. */
+    levels: [number, number];
+  }[];
+}
+
+/**
+ * Companheiro controlado pelo Mestre.
+ *
+ * Ocupa um assento `npc` na mesa e tem ficha igual à de um jogador. Quem o
+ * interpreta é o próprio Mestre, dentro do mesmo turno — não há chamada de API
+ * extra por companheiro.
+ */
+export interface CompanionDef {
+  id: string;
+  name: string;
+  classId: string;
+  originId?: string;
+  /** Quem é e o que quer. Vai no contexto do turno. */
+  personality: string;
+  /** Frases típicas, para calibrar a voz. */
+  catchphrases: string[];
+}
+
+// ---------------------------------------------------------------------------
 // A ambientação
 // ---------------------------------------------------------------------------
 
@@ -293,6 +384,10 @@ export interface SettingDefinition {
   lore: LoreEntry[];
 
   gameMaster: GameMasterPersona;
+  /** Campanha padrão: prólogo, premissa e atos. */
+  campaign?: CampaignDef;
+  /** Companheiros que a mesa pode recrutar para assentos vazios. */
+  companions?: CompanionDef[];
 
   /** Vocabulário da ambientação exibido na UI. */
   labels: {

@@ -6,6 +6,66 @@ import { useIsGm, useMyCharacter, useStore } from '../store.js';
 /** Atalhos que cobrem a maioria das rolagens de mesa. */
 const QUICK = ['1d4', '1d6', '1d8', '1d10', '1d12', '1d20', '2d6', '1d100'];
 
+/**
+ * Testes que o Mestre pediu e ainda esperam um dado.
+ *
+ * É a peça que devolve a agência: o Mestre pede, a mesa para, e o resultado só
+ * existe quando alguém aqui clica. Aparece no topo da bandeja porque enquanto
+ * houver um pedido aberto, ele é a coisa mais importante da tela.
+ */
+export function PendingChecks() {
+  const table = useStore((s) => s.table);
+  const setting = useStore((s) => s.setting);
+  const playerId = useStore((s) => s.playerId);
+  const resolveCheck = useStore((s) => s.resolveCheck);
+  const isGm = useIsGm();
+
+  if (!table || !setting || table.pendingChecks.length === 0) return null;
+
+  return (
+    <div className="panel pending-checks">
+      <div className="panel-title">
+        <h3 style={{ margin: 0 }}>O Mestre pediu um teste</h3>
+      </div>
+
+      {table.pendingChecks.map((check) => {
+        const character = table.characters.find((c) => c.id === check.characterId);
+        const attribute = setting.characterModel.attributes.find((a) => a.id === check.attributeId);
+        const seat = table.participants.find((p) => p.characterId === check.characterId);
+
+        // Companheiro não tem quem clique por ele; ficha de gente tem dono.
+        const mine = seat?.id === playerId;
+        const canRoll = mine || isGm || seat?.seat === 'npc';
+
+        return (
+          <div key={check.id} className="pending-check">
+            <div>
+              <strong>{character?.name ?? 'Alguém'}</strong>
+              <span className="muted"> · {attribute?.name ?? check.attributeId}</span>
+              <span className="mono muted"> vs {check.difficulty}</span>
+              {check.advantage !== 'none' && (
+                <span className={`badge ${check.advantage === 'advantage' ? 'accent' : 'preview'}`}>
+                  {check.advantage === 'advantage' ? 'vantagem' : 'desvantagem'}
+                </span>
+              )}
+              <div className="small muted">{check.reason}</div>
+            </div>
+            <button
+              type="button"
+              className="primary"
+              disabled={!canRoll}
+              title={canRoll ? 'Role o dado' : `Este teste é de ${character?.name ?? 'outro jogador'}`}
+              onClick={() => void resolveCheck(check.id)}
+            >
+              Rolar {setting.rules.checkDice}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function DiceTray() {
   const rollDice = useStore((s) => s.rollDice);
   const check = useStore((s) => s.check);

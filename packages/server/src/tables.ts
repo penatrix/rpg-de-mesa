@@ -24,19 +24,21 @@ import {
   requireSetting,
   roll,
   rollInitiative,
+  type AiUsage,
   type Character,
   type DiceRoll,
   type GameMasterKind,
   type LogEntry,
   type LogEntryKind,
   type Participant,
+  type PendingCheck,
   type Scene,
   type SettingDefinition,
   type TableState,
   type TableView,
 } from '@rpg/shared';
 
-import { config } from './config.js';
+import { config, estimateCents } from './config.js';
 import { joinCodeExists, loadTable, loadTableByJoinCode, saveTable } from './db.js';
 
 export class TableError extends Error {}
@@ -137,6 +139,17 @@ function generateJoinCode(): string {
   return randomUUID().slice(0, 8).toUpperCase();
 }
 
+function emptyUsage(): AiUsage {
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheWriteTokens: 0,
+    cacheReadTokens: 0,
+    requests: 0,
+    estimatedCents: 0,
+  };
+}
+
 export interface CreateTableInput {
   settingId: string;
   tableName: string;
@@ -172,6 +185,7 @@ export function createTable(input: CreateTableInput): { table: TableState; playe
       maxPlayers: MAX_PLAYERS,
       allowNpcCompanions: input.allowNpcCompanions,
       musicEnabled: input.musicEnabled,
+      budgetCents: config.tableBudgetCents,
     },
     participants: [
       {
@@ -197,6 +211,8 @@ export function createTable(input: CreateTableInput): { table: TableState; playe
     createdAt: now,
     updatedAt: now,
     chronicle: '',
+    pendingChecks: [],
+    aiUsage: emptyUsage(),
   };
 
   tables.set(tableId, table);
@@ -212,6 +228,28 @@ export function createTable(input: CreateTableInput): { table: TableState; playe
     gmOnly: false,
   });
 
+  // Prólogo da campanha: texto da própria ambientação, lido antes da primeira
+  // cena. Custa zero em API e é a diferença entre "vocês estão num esgoto" e
+  // uma mesa que sabe onde está e por quê.
+  if (setting.campaign) {
+    appendLog(table, {
+      kind: 'system',
+      authorId: 'gm',
+      authorName: 'Mestre',
+      text: `${setting.campaign.title} — ${setting.campaign.premise}`,
+      gmOnly: false,
+    });
+    for (const paragraph of setting.campaign.prologue) {
+      appendLog(table, {
+        kind: 'narration',
+        authorId: 'gm',
+        authorName: 'Mestre',
+        text: paragraph,
+        gmOnly: false,
+      });
+    }
+  }
+
   if (opening) {
     appendLog(table, {
       kind: 'narration',
@@ -222,8 +260,99 @@ export function createTable(input: CreateTableInput): { table: TableState; playe
     });
   }
 
+  // Companheiros entram já na criação: jogar sozinho com um Mestre é diferente
+  // de jogar sozinho, e o grupo é o que faz a segunda coisa parecer a primeira.
+  if (input.allowNpcCompanions) {
+    for (const companion of (setting.companions ?? []).slice(0, 2)) {
+      try {
+        addCompanion(table, companion.id);
+      } catch {
+        // Companheiro mal definido não pode impedir a mesa de existir.
+      }
+    }
+  }
+
   touch(table);
   return { table, playerId };
+}
+
+// ---------------------------------------------------------------------------
+// Companheiros NPC
+// ---------------------------------------------------------------------------
+
+/**
+ * Recruta um companheiro da ambientação para um assento `npc`.
+ *
+ * O companheiro é um participante como outro qualquer — tem ficha, entra na
+ * iniciativa e toma dano. A diferença é quem fala por ele: o Mestre, dentro do
+ * turno que já ia acontecer. Não há uma segunda IA nem uma segunda chamada.
+ */
+export function addCompanion(table: TableState, companionId: string): Character {
+  const setting = settingOf(table);
+  const companion = setting.companions?.find((c) => c.id === companionId);
+  if (!companion) throw new TableError(`Companheiro desconhecido: ${companionId}`);
+
+  if (table.participants.some((p) => p.seat === 'npc' && p.name === companion.name)) {
+    throw new TableError(`${companion.name} já está no grupo.`);
+  }
+
+  const seats = table.participants.filter((p) => p.role === 'player').length;
+  if (seats >= table.config.maxPlayers) {
+    throw new TableError(`O grupo já tem ${table.config.maxPlayers} integrantes.`);
+  }
+
+  const character = createCharacter(setting, {
+    id: randomUUID(),
+    name: companion.name,
+    classId: companion.classId,
+    originId: companion.originId,
+  });
+
+  table.characters.push(character);
+  table.participants.push({
+    id: randomUUID(),
+    name: companion.name,
+    role: 'player',
+    seat: 'npc',
+    characterId: character.id,
+    connected: true,
+    lastSeen: Date.now(),
+  });
+
+  appendLog(table, {
+    kind: 'system',
+    authorId: 'system',
+    authorName: 'Sistema',
+    text: `${companion.name} se junta ao grupo.`,
+    gmOnly: false,
+  });
+
+  syncPartyIntoScene(table);
+  touch(table);
+  return character;
+}
+
+export function removeCompanion(table: TableState, participantId: string): void {
+  const participant = table.participants.find((p) => p.id === participantId);
+  if (!participant || participant.seat !== 'npc') {
+    throw new TableError('Este assento não é de um companheiro.');
+  }
+
+  table.participants = table.participants.filter((p) => p.id !== participantId);
+  table.characters = table.characters.filter((c) => c.id !== participant.characterId);
+  table.scene.combatants = table.scene.combatants.filter(
+    (c) => c.characterId !== participant.characterId,
+  );
+
+  appendLog(table, {
+    kind: 'system',
+    authorId: 'system',
+    authorName: 'Sistema',
+    text: `${participant.name} deixa o grupo.`,
+    gmOnly: false,
+  });
+
+  touch(table);
 }
 
 export function joinTable(
@@ -541,18 +670,27 @@ export function gmRoll(
   return diceRoll;
 }
 
-/** Teste pedido pelo Mestre a um personagem do grupo. */
-export function gmCheck(
+// ---------------------------------------------------------------------------
+// Testes pedidos pelo Mestre, rolados pelo jogador
+// ---------------------------------------------------------------------------
+
+/**
+ * O Mestre pede o teste; quem rola é o jogador.
+ *
+ * Esta separação é o ponto: um Mestre que pede *e* rola transforma a mesa em
+ * texto que acontece com você. O pedido fica pendente até alguém à mesa pegar
+ * o dado — e é a rolagem que devolve o turno ao Mestre.
+ */
+export function requestCheck(
   table: TableState,
   input: {
     characterId: string;
     attributeId: string;
     difficulty: number;
-    label?: string;
+    reason: string;
     advantage?: 'none' | 'advantage' | 'disadvantage';
-    secret?: boolean;
   },
-): { roll: DiceRoll; degree: string; characterName: string } {
+): { check: PendingCheck; characterName: string; attributeName: string } {
   const setting = settingOf(table);
   const character = table.characters.find(
     (c) => c.id === input.characterId || c.name === input.characterId,
@@ -562,33 +700,122 @@ export function gmCheck(
   const attribute = setting.characterModel.attributes.find((a) => a.id === input.attributeId);
   if (!attribute) throw new TableError(`Atributo desconhecido: ${input.attributeId}`);
 
+  // Um pedido por personagem de cada vez: dois testes pendentes para a mesma
+  // ficha só produzem confusão sobre qual botão resolve o quê.
+  table.pendingChecks = table.pendingChecks.filter((p) => p.characterId !== character.id);
+
+  const check: PendingCheck = {
+    id: randomUUID(),
+    characterId: character.id,
+    attributeId: attribute.id,
+    difficulty: input.difficulty,
+    reason: input.reason.slice(0, 200),
+    advantage: input.advantage ?? 'none',
+    requestedAt: Date.now(),
+  };
+  table.pendingChecks.push(check);
+
+  appendLog(table, {
+    kind: 'system',
+    authorId: 'gm',
+    authorName: 'Mestre',
+    text:
+      `${character.name}, role ${attribute.name} contra ${input.difficulty} — ${check.reason}`,
+    gmOnly: false,
+  });
+
+  touch(table);
+  return { check, characterName: character.name, attributeName: attribute.name };
+}
+
+/**
+ * Resolve um teste pendente com o dado do jogador.
+ *
+ * Companheiros NPC não têm ninguém para clicar o botão, então qualquer um à
+ * mesa pode rolar por eles — mas a ficha de um jogador humano só é rolada pelo
+ * dono dela ou pelo Mestre.
+ */
+export function resolvePendingCheck(
+  table: TableState,
+  playerId: string,
+  checkId: string,
+): { roll: DiceRoll; degree: string; characterName: string; reason: string } {
+  const setting = settingOf(table);
+  const check = table.pendingChecks.find((p) => p.id === checkId);
+  if (!check) throw new TableError('Este teste já foi resolvido.');
+
+  const character = table.characters.find((c) => c.id === check.characterId);
+  if (!character) throw new TableError('O personagem deste teste não está mais na mesa.');
+
+  const owner = table.participants.find((p) => p.characterId === character.id);
+  const requester = table.participants.find((p) => p.id === playerId);
+  const ownedByHuman = owner?.seat === 'human';
+
+  if (ownedByHuman && owner.id !== playerId && requester?.role !== 'gm') {
+    throw new TableError(`Este teste é de ${character.name}.`);
+  }
+
+  const attribute = setting.characterModel.attributes.find((a) => a.id === check.attributeId);
+  if (!attribute) throw new TableError(`Atributo desconhecido: ${check.attributeId}`);
+
   const result = performCheck({
     setting,
     character,
     attributeId: attribute.id,
-    difficulty: input.difficulty,
+    difficulty: check.difficulty,
     seed: makeSeed(table.id, rollNonce++),
-    rolledBy: 'gm',
-    label: input.label ?? `${attribute.name} (${character.name})`,
-    advantage: input.advantage,
-    secret: input.secret,
+    rolledBy: playerId,
+    label: `${attribute.name} — ${check.reason}`,
+    advantage: check.advantage,
+    secret: false,
   });
+
+  table.pendingChecks = table.pendingChecks.filter((p) => p.id !== checkId);
 
   const degree = setting.rules.degreeLabels[result.outcome.degree];
   appendLog(table, {
     kind: 'roll',
-    authorId: 'gm',
-    authorName: 'Mestre',
+    authorId: playerId,
+    authorName: character.name,
     text:
-      `${character.name} — ${attribute.name} vs ${input.difficulty}: ` +
+      `${character.name} — ${attribute.name} vs ${check.difficulty}: ` +
       `${result.roll.total} (${degree})`,
     roll: result.roll,
-    gmOnly: Boolean(input.secret),
+    gmOnly: false,
   });
 
-  if (!input.secret) emitter?.roll(table.id, result.roll);
+  emitter?.roll(table.id, result.roll);
   touch(table);
-  return { roll: result.roll, degree, characterName: character.name };
+  return { roll: result.roll, degree, characterName: character.name, reason: check.reason };
+}
+
+// ---------------------------------------------------------------------------
+// Consumo do Mestre IA
+// ---------------------------------------------------------------------------
+
+/** Soma o consumo de uma chamada ao acumulado da mesa. */
+export function recordAiUsage(
+  table: TableState,
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheWriteTokens: number;
+    cacheReadTokens: number;
+  },
+): void {
+  const current = table.aiUsage;
+  current.inputTokens += usage.inputTokens;
+  current.outputTokens += usage.outputTokens;
+  current.cacheWriteTokens += usage.cacheWriteTokens;
+  current.cacheReadTokens += usage.cacheReadTokens;
+  current.requests += 1;
+  current.estimatedCents += estimateCents(usage);
+}
+
+/** Verdadeiro quando a mesa já gastou o que lhe foi permitido gastar. */
+export function budgetExhausted(table: TableState): boolean {
+  const budget = table.config.budgetCents;
+  return budget > 0 && table.aiUsage.estimatedCents >= budget;
 }
 
 // ---------------------------------------------------------------------------

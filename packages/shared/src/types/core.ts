@@ -192,6 +192,46 @@ export interface TableConfig {
   /** Permite que a IA controle assentos vazios como NPCs companheiros. */
   allowNpcCompanions: boolean;
   musicEnabled: boolean;
+  /**
+   * Teto de gasto do Mestre IA nesta mesa, em centavos de dólar. `0` = sem teto.
+   * Fixado na criação para que mudar o padrão do servidor não altere mesas em
+   * andamento no meio de uma sessão.
+   */
+  budgetCents: number;
+}
+
+/**
+ * Teste que o Mestre pediu e ainda aguarda o jogador rolar.
+ *
+ * Existe para devolver a agência ao jogador: o Mestre pede, quem rola é você.
+ */
+export interface PendingCheck {
+  id: string;
+  characterId: CharacterId;
+  attributeId: string;
+  difficulty: number;
+  reason: string;
+  advantage: 'none' | 'advantage' | 'disadvantage';
+  requestedAt: number;
+}
+
+/**
+ * Consumo acumulado do Mestre IA nesta mesa.
+ *
+ * Fica no estado da mesa e vai para a tela: uma conta que só aparece no fim do
+ * mês é uma conta que ninguém controla. `cacheReadTokens` alto em relação a
+ * `inputTokens` é sinal de saúde — quer dizer que o prefixo caro está sendo
+ * reaproveitado em vez de reenviado.
+ */
+export interface AiUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheWriteTokens: number;
+  cacheReadTokens: number;
+  /** Chamadas à API — cada ferramenta usada é uma ida e volta. */
+  requests: number;
+  /** Custo estimado em centavos de dólar. Estimativa, não fatura. */
+  estimatedCents: number;
 }
 
 export interface TableState {
@@ -207,6 +247,10 @@ export interface TableState {
   updatedAt: number;
   /** Resumo da campanha até aqui — memória de longo prazo do Mestre IA. */
   chronicle: string;
+  /** Testes pedidos pelo Mestre e ainda não rolados pelos jogadores. */
+  pendingChecks: PendingCheck[];
+  /** Consumo do Mestre IA nesta mesa. */
+  aiUsage: AiUsage;
 }
 
 /** Projeção da mesa entregue a um participante, já filtrada por permissão. */

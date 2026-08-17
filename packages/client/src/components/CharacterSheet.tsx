@@ -5,6 +5,7 @@ import { carryStatus, experienceForLevel } from '@rpg/shared';
 
 import { useStore } from '../store.js';
 import { vitalColor } from '../theme.js';
+import { Inventory } from './Inventory.js';
 
 export function VitalBar({
   id,
@@ -64,16 +65,6 @@ export function CharacterSheet({
     nextLevelXp > currentLevelXp
       ? ((character.experience - currentLevelXp) / (nextLevelXp - currentLevelXp)) * 100
       : 0;
-
-  function toggleEquip(itemId: string) {
-    if (!editable) return;
-    void updateCharacter({
-      ...character,
-      inventory: character.inventory.map((entry) =>
-        entry.itemId === itemId ? { ...entry, equipped: !entry.equipped } : entry,
-      ),
-    });
-  }
 
   return (
     <div className="panel">
@@ -157,33 +148,7 @@ export function CharacterSheet({
         })}
       </div>
 
-      <h4>Inventário</h4>
-      <div style={{ marginBottom: '0.8rem' }}>
-        {character.inventory.length === 0 && <span className="small muted">Vazio.</span>}
-        {character.inventory.map((entry) => {
-          const item = setting.items.find((i) => i.id === entry.itemId);
-          const equippable = item && item.slot !== 'consumable' && item.slot !== 'misc';
-          return (
-            <div
-              key={entry.itemId}
-              className={`inventory-item ${entry.equipped ? 'equipped' : ''}`}
-              title={item?.description}
-            >
-              <span>
-                {item?.name ?? entry.itemId}
-                {entry.quantity > 1 && <span className="muted"> ×{entry.quantity}</span>}
-              </span>
-              {equippable && editable ? (
-                <button type="button" className="tiny ghost" onClick={() => toggleEquip(entry.itemId)}>
-                  {entry.equipped ? 'equipado' : 'equipar'}
-                </button>
-              ) : (
-                <span className="small muted">{item?.slot}</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      <Inventory character={character} setting={setting} editable={editable} />
 
       <h4>Anotações</h4>
       <textarea

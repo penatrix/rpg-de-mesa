@@ -38,6 +38,12 @@ services:
       - key: RPG_DB_PATH
         value: /tmp/rpg.db
 
+      # Teto de gasto do Mestre IA por mesa, em centavos de dólar. Um serviço
+      # público sem autenticação é um serviço onde qualquer um pode abrir mesa
+      # com a sua chave — o teto é o que impede que isso vire uma conta aberta.
+      - key: RPG_TABLE_BUDGET_CENTS
+        value: "100"
+
     # disk:
     #   name: rpg-data
     #   mountPath: /app/data

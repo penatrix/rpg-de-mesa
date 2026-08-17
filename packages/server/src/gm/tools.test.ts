@@ -28,6 +28,7 @@ function fakeTable(settingId: string): TableState {
       maxPlayers: 6,
       allowNpcCompanions: true,
       musicEnabled: true,
+      budgetCents: 100,
     },
     participants: [
       { id: 'p1', name: 'Jogador', role: 'player', seat: 'human', connected: true, lastSeen: Date.now() },
@@ -45,6 +46,15 @@ function fakeTable(settingId: string): TableState {
     createdAt: Date.now(),
     updatedAt: Date.now(),
     chronicle: '',
+    pendingChecks: [],
+    aiUsage: {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 0,
+      requests: 0,
+      estimatedCents: 0,
+    },
   };
 }
 

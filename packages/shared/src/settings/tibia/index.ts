@@ -12,6 +12,7 @@ import { tibiaSpells } from './spells.js';
 import { tibiaBestiary } from './bestiary.js';
 import { tibiaLocations } from './locations.js';
 import { tibiaGameMaster, tibiaLore } from './lore.js';
+import { tibiaCampaign, tibiaCompanions } from './campaign.js';
 
 export const tibiaSetting: SettingDefinition = {
   id: 'tibia',
@@ -43,6 +44,8 @@ export const tibiaSetting: SettingDefinition = {
   lore: tibiaLore,
 
   gameMaster: tibiaGameMaster,
+  campaign: tibiaCampaign,
+  companions: tibiaCompanions,
 
   labels: {
     character: 'Personagem',

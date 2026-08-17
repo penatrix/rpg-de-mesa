@@ -193,7 +193,9 @@ export function HomeScreen() {
                     checked={allowNpc}
                     onChange={(e) => setAllowNpc(e.target.checked)}
                   />
-                  <span>Companheiros NPC nos assentos vazios</span>
+                  <span title="O Mestre interpreta os companheiros no mesmo turno — não custa nenhuma chamada a mais à IA.">
+                    Companheiros NPC no grupo
+                  </span>
                 </label>
                 <label className="row" style={{ marginBottom: 0 }}>
                   <input

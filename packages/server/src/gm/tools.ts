@@ -33,15 +33,12 @@ export function buildGmTools(table: TableState, setting: SettingDefinition) {
     betaZodTool({
       name: 'roll_dice',
       description:
-        'Rola dados em notação padrão (ex.: "2d6+3", "1d20", "4d6kh3"). Use para dano, tabelas ' +
-        'aleatórias e decisões do mundo. Para testes de personagem prefira request_check.',
+        'Rola dados ("2d6+3", "4d6kh3"). Dano, tabelas e decisões do mundo. Para testes de ' +
+        'personagem use request_check.',
       inputSchema: z.object({
-        notation: z.string().describe('Notação de dados, ex.: "3d10+5".'),
-        label: z.string().describe('O que está sendo rolado, ex.: "Dano do sopro do dragão".'),
-        secret: z
-          .boolean()
-          .optional()
-          .describe('Se verdadeiro, só o Mestre vê o resultado. Use para rolagens de emboscada.'),
+        notation: z.string().describe('Notação, ex.: "3d10+5".'),
+        label: z.string().describe('O que está sendo rolado.'),
+        secret: z.boolean().optional().describe('Se verdadeiro, só o Mestre vê.'),
       }),
       run: async ({ notation, label, secret }) => {
         try {
@@ -59,8 +56,8 @@ export function buildGmTools(table: TableState, setting: SettingDefinition) {
     betaZodTool({
       name: 'request_check',
       description:
-        'Pede um teste de atributo a um personagem do grupo e resolve a rolagem. Use sempre que ' +
-        'uma ação declarada tiver resultado incerto. Não decida o resultado por conta própria.',
+        'Pede um teste ao jogador. Você NÃO recebe o resultado agora: quem rola é ele. Peça, ' +
+        'encerre o turno com a tensão no ar, e narre a consequência quando o dado voltar.',
       inputSchema: z.object({
         character_id: z.string().describe('Id ou nome do personagem.'),
         attribute_id: z.string().describe(`Um de: ${attributeIds.join(', ')}.`),
@@ -68,28 +65,29 @@ export function buildGmTools(table: TableState, setting: SettingDefinition) {
           .number()
           .int()
           .describe(
-            `Dificuldade alvo. Referência: ${setting.rules.difficulties
-              .map((d) => `${d.name}=${d.value}`)
-              .join(', ')}.`,
+            `Alvo. ${setting.rules.difficulties.map((d) => `${d.name}=${d.value}`).join(', ')}.`,
           ),
-        label: z.string().optional().describe('O que está sendo testado.'),
+        reason: z.string().describe('O que ele está tentando fazer, em poucas palavras.'),
         advantage: z
           .enum(['none', 'advantage', 'disadvantage'])
           .optional()
-          .describe('Vantagem quando a situação favorece; desvantagem quando atrapalha.'),
+          .describe('Vantagem se a situação favorece; desvantagem se atrapalha.'),
       }),
-      run: async ({ character_id, attribute_id, difficulty, label, advantage }) => {
+      run: async ({ character_id, attribute_id, difficulty, reason, advantage }) => {
         try {
-          const result = tables.gmCheck(table, {
+          const result = tables.requestCheck(table, {
             characterId: character_id,
             attributeId: attribute_id,
             difficulty,
-            label,
+            reason,
             advantage,
           });
+          // Deliberadamente não devolve resultado: se devolvesse, o modelo
+          // continuaria o turno narrando um desfecho que o jogador não rolou —
+          // que é exatamente o problema que esta ferramenta existe para acabar.
           return (
-            `${result.characterName}: ${result.roll.total} contra ${difficulty} → ${result.degree} ` +
-            `(margem ${result.roll.check?.margin ?? 0}). Narre a consequência.`
+            `Pedido enviado a ${result.characterName} (${result.attributeName} vs ${difficulty}). ` +
+            `O dado é dele. Encerre o turno aqui.`
           );
         } catch (error) {
           return fail(error);
@@ -100,13 +98,13 @@ export function buildGmTools(table: TableState, setting: SettingDefinition) {
     betaZodTool({
       name: 'set_scene',
       description:
-        'Muda a cena atual: título, descrição, local e trilha sonora. Chame ao mover o grupo para ' +
-        'um novo lugar ou quando o clima da cena mudar.',
+        'Muda a cena: título, descrição, local e trilha. Chame ao mover o grupo ou quando o clima ' +
+        'mudar.',
       inputSchema: z.object({
-        title: z.string().describe('Título curto da cena.'),
-        description: z.string().describe('Descrição do que o grupo vê e sente agora.'),
+        title: z.string().describe('Título curto.'),
+        description: z.string().describe('O que o grupo vê e sente agora.'),
         location_id: z.string().optional().describe('Id de local do catálogo.'),
-        track_id: z.string().optional().describe('Id de trilha. Se omitido, usa a do local.'),
+        track_id: z.string().optional().describe('Id de trilha; padrão é a do local.'),
       }),
       run: async ({ title, description, location_id, track_id }) => {
         try {
@@ -126,11 +124,10 @@ export function buildGmTools(table: TableState, setting: SettingDefinition) {
     betaZodTool({
       name: 'spawn_creature',
       description:
-        'Coloca criaturas do bestiário em cena. Use antes de start_combat. Calibre pela ameaça ' +
-        'da criatura contra o nível do grupo.',
+        'Põe criaturas em cena, antes de start_combat. Calibre a ameaça pelo nível do grupo.',
       inputSchema: z.object({
         bestiary_id: z.string().describe('Id do bestiário.'),
-        count: z.number().int().min(1).max(12).describe('Quantas criaturas (1 a 12).'),
+        count: z.number().int().min(1).max(12).describe('Quantas (1 a 12).'),
       }),
       run: async ({ bestiary_id, count }) => {
         try {
@@ -150,8 +147,8 @@ export function buildGmTools(table: TableState, setting: SettingDefinition) {
     betaZodTool({
       name: 'damage',
       description:
-        'Aplica dano a um combatente. Chame sempre que narrar um golpe que acerta — narrar sem ' +
-        'chamar deixa a ficha desatualizada.',
+        'Aplica dano. Chame sempre que narrar um golpe que acerta — narrar sem chamar deixa a ' +
+        'ficha errada.',
       inputSchema: z.object({
         combatant_id: z.string().describe('Id ou nome do combatente em cena.'),
         vital_id: z.string().describe(`Um de: ${vitalIds.join(', ')}.`),
@@ -169,7 +166,7 @@ export function buildGmTools(table: TableState, setting: SettingDefinition) {
 
     betaZodTool({
       name: 'heal',
-      description: 'Restaura um vital de um combatente (cura, poção, descanso).',
+      description: 'Restaura um vital (cura, poção, descanso).',
       inputSchema: z.object({
         combatant_id: z.string().describe('Id ou nome do combatente.'),
         vital_id: z.string().describe(`Um de: ${vitalIds.join(', ')}.`),
@@ -187,8 +184,7 @@ export function buildGmTools(table: TableState, setting: SettingDefinition) {
 
     betaZodTool({
       name: 'start_combat',
-      description:
-        'Inicia o combate e rola iniciativa para todos em cena. Chame depois de spawn_creature.',
+      description: 'Inicia o combate e rola iniciativa. Chame depois de spawn_creature.',
       inputSchema: z.object({}),
       run: async () => {
         try {
@@ -205,7 +201,7 @@ export function buildGmTools(table: TableState, setting: SettingDefinition) {
 
     betaZodTool({
       name: 'next_turn',
-      description: 'Passa para o próximo combatente na ordem de iniciativa.',
+      description: 'Passa a vez ao próximo na iniciativa.',
       inputSchema: z.object({}),
       run: async () => {
         try {
@@ -220,7 +216,7 @@ export function buildGmTools(table: TableState, setting: SettingDefinition) {
 
     betaZodTool({
       name: 'end_combat',
-      description: 'Encerra o combate. Chame quando um dos lados cair, fugir ou se render.',
+      description: 'Encerra o combate quando um lado cai, foge ou se rende.',
       inputSchema: z.object({}),
       run: async () => {
         try {
@@ -235,11 +231,11 @@ export function buildGmTools(table: TableState, setting: SettingDefinition) {
     betaZodTool({
       name: 'grant_xp',
       description:
-        'Concede experiência a um personagem. Sobe de nível automaticamente quando a curva ' +
-        'permitir. Use ao superar combates, enigmas e cenas importantes.',
+        'Concede experiência; o nível sobe sozinho quando a curva permitir. Use ao superar ' +
+        'combates, enigmas e cenas importantes.',
       inputSchema: z.object({
         character_id: z.string().describe('Id ou nome do personagem.'),
-        amount: z.number().int().min(0).describe('Experiência concedida.'),
+        amount: z.number().int().min(0).describe('Experiência.'),
       }),
       run: async ({ character_id, amount }) => {
         try {
@@ -252,7 +248,7 @@ export function buildGmTools(table: TableState, setting: SettingDefinition) {
 
     betaZodTool({
       name: 'give_item',
-      description: 'Entrega um item do catálogo a um personagem (loot, recompensa, compra).',
+      description: 'Entrega um item do catálogo (loot, recompensa, compra).',
       inputSchema: z.object({
         character_id: z.string().describe('Id ou nome do personagem.'),
         item_id: z.string().describe('Id do item no catálogo.'),
@@ -269,10 +265,9 @@ export function buildGmTools(table: TableState, setting: SettingDefinition) {
 
     betaZodTool({
       name: 'set_music',
-      description:
-        'Troca a trilha sonora da mesa para acompanhar o clima. Passe null para silenciar.',
+      description: 'Troca a trilha para acompanhar o clima. null silencia.',
       inputSchema: z.object({
-        track_id: z.string().nullable().describe('Id da trilha, ou null para silêncio.'),
+        track_id: z.string().nullable().describe('Id da trilha, ou null.'),
       }),
       run: async ({ track_id }) => {
         try {
@@ -287,8 +282,8 @@ export function buildGmTools(table: TableState, setting: SettingDefinition) {
     betaZodTool({
       name: 'lookup',
       description:
-        'Consulta a ficha completa de uma criatura, item, magia ou local do catálogo. Os catálogos ' +
-        'no seu contexto trazem só id e nome — use isto quando precisar dos números.',
+        'Ficha completa de uma criatura, item, magia ou local. O seu contexto traz só os ids — ' +
+        'use isto quando precisar dos números.',
       inputSchema: z.object({
         kind: z.enum(['creature', 'item', 'ability', 'location']),
         id: z.string().describe('Id do catálogo.'),
@@ -330,8 +325,7 @@ export function buildGmTools(table: TableState, setting: SettingDefinition) {
     betaZodTool({
       name: 'private_note',
       description:
-        'Registra uma nota visível apenas para o Mestre — planos, segredos, o que a emboscada ' +
-        'está esperando. Os jogadores nunca veem isto.',
+        'Nota visível só para você: planos, segredos, o que a emboscada espera.',
       inputSchema: z.object({
         text: z.string().describe('A nota.'),
       }),
@@ -348,11 +342,11 @@ export function buildGmTools(table: TableState, setting: SettingDefinition) {
     betaZodTool({
       name: 'update_chronicle',
       description:
-        'Atualiza o resumo da campanha — sua memória de longo prazo. O histórico de mensagens é ' +
-        'truncado a cada turno; a crônica não. Registre decisões, promessas, mortes e pistas ' +
-        'importantes. Reescreva o resumo inteiro, não apenas o acréscimo.',
+        'Reescreve o resumo da campanha — sua memória de longo prazo, já que o histórico é ' +
+        'truncado a cada turno. Registre decisões, promessas, mortes e pistas. Mande o resumo ' +
+        'inteiro, não só o acréscimo.',
       inputSchema: z.object({
-        summary: z.string().describe('Resumo completo e atualizado da campanha até aqui.'),
+        summary: z.string().describe('Resumo completo e atualizado.'),
       }),
       run: async ({ summary }) => {
         try {

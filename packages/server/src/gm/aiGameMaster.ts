@@ -35,9 +35,6 @@ export interface GameMaster {
   runTurn(table: TableState, playerPrompt: string, hooks: GmHooks): Promise<void>;
 }
 
-/** Um turno de Mestre não deve consumir a mesa inteira em ferramentas. */
-const MAX_TOOL_ITERATIONS = 12;
-
 export class AiGameMaster implements GameMaster {
   readonly kind = 'ai' as const;
   private readonly client: Anthropic;
@@ -64,23 +61,36 @@ export class AiGameMaster implements GameMaster {
     try {
       const runner = this.client.beta.messages.toolRunner({
         model: config.gmModel,
-        max_tokens: 16000,
-        // O pensamento adaptativo deixa o modelo decidir quanto raciocinar por
-        // turno: uma pergunta simples responde rápido, um combate complexo pensa.
+        // Uma narração de mesa cabe folgada aqui. Teto alto não melhora a
+        // narração — só remove o freio quando o modelo resolve divagar, e a
+        // saída é o token mais caro da conta.
+        max_tokens: config.gmMaxTokens,
+        // Pensamento estendido fica desligado por padrão: narrar três frases e
+        // chamar `damage` não é um problema de raciocínio, e o pensamento é
+        // cobrado como saída. `RPG_GM_THINKING=1` liga para mesas que preferem
+        // combates mais bem calibrados ao custo menor.
         //
-        // Os dois `as` abaixo não são gambiarra de conveniência: a API aceita
+        // Os `as` abaixo não são gambiarra de conveniência: a API aceita
         // `adaptive` e os níveis `xhigh`/`max`, mas os tipos publicados nesta
         // versão do SDK ainda descrevem só `enabled`/`disabled` e até `high`.
         // Remova os casts quando o SDK alcançar a API.
-        thinking: { type: 'adaptive' } as unknown as { type: 'enabled'; budget_tokens: number },
+        ...(config.gmThinking
+          ? {
+              thinking: { type: 'adaptive' } as unknown as {
+                type: 'enabled';
+                budget_tokens: number;
+              },
+            }
+          : {}),
         output_config: { effort: config.gmEffort as 'low' | 'medium' | 'high' },
         system: [
           {
             type: 'text',
             text: this.systemFor(setting),
-            // O prefixo (cânone + catálogos) é idêntico em todos os turnos desta
-            // ambientação. Marcá-lo aqui faz o custo cair para leitura de cache
-            // a partir do segundo turno.
+            // O prefixo (cânone + catálogos + campanha) é idêntico em todos os
+            // turnos desta ambientação. O ponto de corte fica *depois* das
+            // ferramentas na ordem do prompt, então marcar aqui cacheia as duas
+            // coisas de uma vez.
             cache_control: { type: 'ephemeral' },
           },
         ],
@@ -88,10 +98,21 @@ export class AiGameMaster implements GameMaster {
         messages: [
           {
             role: 'user',
-            content: `${buildTurnContext(table, setting)}\n\n# Turno\n${playerPrompt}`,
+            content: [
+              {
+                type: 'text',
+                text: `${buildTurnContext(table, setting)}\n\n# Turno\n${playerPrompt}`,
+                // Segundo ponto de corte, e o que mais economiza dentro de um
+                // turno: o executor de ferramentas faz uma chamada por
+                // ferramenta, sempre com este mesmo texto na frente. Sem esta
+                // marca, um turno com seis ferramentas reenviaria o contexto
+                // inteiro seis vezes a preço cheio.
+                cache_control: { type: 'ephemeral' },
+              },
+            ],
           },
         ],
-        max_iterations: MAX_TOOL_ITERATIONS,
+        max_iterations: config.gmMaxIterations,
         stream: true,
       });
 
@@ -120,6 +141,15 @@ export class AiGameMaster implements GameMaster {
         });
 
         const message = await stream.finalMessage();
+
+        // Contabiliza antes de qualquer outra coisa: a chamada já foi feita e
+        // já foi cobrada, mesmo que o resto deste turno falhe.
+        tables.recordAiUsage(table, {
+          inputTokens: message.usage.input_tokens ?? 0,
+          outputTokens: message.usage.output_tokens ?? 0,
+          cacheWriteTokens: message.usage.cache_creation_input_tokens ?? 0,
+          cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
+        });
 
         if (entryId) {
           tables.finalizeLogEntry(table, entryId, buffer);

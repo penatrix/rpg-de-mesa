@@ -4,7 +4,9 @@ import type { SettingDefinition } from '@rpg/shared';
 
 /** Consulta rápida do mundo: lore, bestiário, locais, itens e habilidades. */
 export function Codex({ setting }: { setting: SettingDefinition }) {
-  const [tab, setTab] = useState<'lore' | 'bestiario' | 'locais' | 'itens' | 'magias'>('lore');
+  const [tab, setTab] = useState<
+    'campanha' | 'lore' | 'bestiario' | 'locais' | 'itens' | 'magias'
+  >(setting.campaign ? 'campanha' : 'lore');
   const [query, setQuery] = useState('');
 
   const filter = useMemo(() => query.trim().toLowerCase(), [query]);
@@ -18,6 +20,7 @@ export function Codex({ setting }: { setting: SettingDefinition }) {
       <div className="tabs" role="tablist">
         {(
           [
+            ...(setting.campaign ? ([['campanha', 'Campanha']] as const) : []),
             ['lore', 'Lore'],
             ['bestiario', setting.labels.bestiary],
             ['locais', 'Locais'],
@@ -48,6 +51,36 @@ export function Codex({ setting }: { setting: SettingDefinition }) {
       </div>
 
       <div style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+        {tab === 'campanha' && setting.campaign && (
+          <div className="codex-entry">
+            <strong>{setting.campaign.title}</strong>
+            <p className="small" style={{ margin: '0.3em 0 0.8em' }}>
+              {setting.campaign.premise}
+            </p>
+
+            {setting.campaign.prologue.map((paragraph, index) => (
+              <p key={index} className="small" style={{ margin: '0 0 0.6em' }}>
+                {paragraph}
+              </p>
+            ))}
+
+            <h4 style={{ marginBottom: '0.3rem' }}>Atos</h4>
+            {setting.campaign.acts.map((act) => (
+              <div key={act.id} style={{ marginBottom: '0.6em' }}>
+                <div className="row" style={{ justifyContent: 'space-between' }}>
+                  <strong className="small">{act.title}</strong>
+                  <span className="badge mono">
+                    {act.levels[0]}–{act.levels[1]}
+                  </span>
+                </div>
+                <p className="small muted" style={{ margin: '0.2em 0 0' }}>
+                  {act.goal}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
         {tab === 'lore' &&
           setting.lore
             .filter((entry) => matches(entry.title, entry.text, entry.category))

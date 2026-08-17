@@ -1,13 +1,53 @@
 import { useState } from 'react';
 
+import type { TableView } from '@rpg/shared';
+
 import { useIsGm, useMyCharacter, useStore } from '../store.js';
 import { setVolume, stopMusic, unlockAudio } from '../audio/music.js';
 import { CharacterSheet } from '../components/CharacterSheet.js';
 import { CombatPanel, PartyPanel } from '../components/PartyPanel.js';
-import { DiceTray } from '../components/DiceTray.js';
+import { DiceTray, PendingChecks } from '../components/DiceTray.js';
 import { LogView } from '../components/LogView.js';
 import { GmPanel } from '../components/GmPanel.js';
 import { Codex } from '../components/Codex.js';
+
+/**
+ * Quanto o Mestre IA já custou nesta mesa.
+ *
+ * Fica no cabeçalho, ao lado do papel de quem joga, porque uma conta que só
+ * aparece na fatura do fim do mês é uma conta que ninguém controla — e porque
+ * o número muda a forma de jogar: dá para ver que abrir combate custa mais que
+ * conversar, e decidir com essa informação na mão.
+ */
+function UsageMeter({ table }: { table: TableView }) {
+  const { aiUsage, config } = table;
+  const dollars = aiUsage.estimatedCents / 100;
+  const budget = config.budgetCents;
+  const share = budget > 0 ? aiUsage.estimatedCents / budget : 0;
+
+  // Leitura de cache alta em relação à entrada crua é sinal de saúde: quer
+  // dizer que o prefixo caro está sendo reaproveitado, não reenviado.
+  const cached = aiUsage.cacheReadTokens + aiUsage.inputTokens;
+  const cacheShare = cached > 0 ? Math.round((aiUsage.cacheReadTokens / cached) * 100) : 0;
+
+  return (
+    <span
+      className={`badge usage-meter ${share >= 0.75 ? 'preview' : ''}`}
+      title={
+        `${aiUsage.requests} chamadas à API\n` +
+        `entrada ${aiUsage.inputTokens.toLocaleString('pt-BR')} tokens\n` +
+        `cache lido ${aiUsage.cacheReadTokens.toLocaleString('pt-BR')} (${cacheShare}% do total lido)\n` +
+        `cache gravado ${aiUsage.cacheWriteTokens.toLocaleString('pt-BR')}\n` +
+        `saída ${aiUsage.outputTokens.toLocaleString('pt-BR')}\n\n` +
+        (budget > 0 ? `Teto desta mesa: US$ ${(budget / 100).toFixed(2)}\n` : '') +
+        'Estimativa a partir do uso relatado pela API — a conta oficial é a do painel da Anthropic.'
+      }
+    >
+      US$ {dollars.toFixed(3)}
+      {budget > 0 && <span className="muted"> / {(budget / 100).toFixed(2)}</span>}
+    </span>
+  );
+}
 
 export function TableScreen() {
   const table = useStore((s) => s.table);
@@ -71,6 +111,7 @@ export function TableScreen() {
           {!connected && <span className="badge preview">reconectando…</span>}
           <span className="badge">{isGm ? 'Mestre' : 'Jogador'}</span>
           <span className="badge accent">{aiGm ? 'Mestre IA' : 'Mestre humano'}</span>
+          {aiGm && <UsageMeter table={table} />}
 
           {table.config.musicEnabled && (
             <label className="row small" style={{ marginBottom: 0 }} title="Volume da trilha">
@@ -184,6 +225,7 @@ export function TableScreen() {
 
         {rightTab === 'mesa' ? (
           <>
+            <PendingChecks />
             <PartyPanel table={table} setting={setting} />
             <CombatPanel table={table} setting={setting} />
             <DiceTray />

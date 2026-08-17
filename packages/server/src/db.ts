@@ -69,18 +69,44 @@ export function saveTable(table: TableState): void {
     });
 }
 
+/**
+ * Reidrata uma mesa gravada, preenchendo campos que versões anteriores não
+ * conheciam.
+ *
+ * O estado vai para o banco como um único blob JSON, então uma mesa criada
+ * antes de um campo existir volta sem ele — e o servidor quebraria no primeiro
+ * `table.pendingChecks.push`. Migração de esquema aqui é uma linha; ausência
+ * dela é um erro em produção numa mesa antiga.
+ */
+function hydrate(raw: string): TableState {
+  const table = JSON.parse(raw) as TableState;
+
+  table.pendingChecks ??= [];
+  table.aiUsage ??= {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheWriteTokens: 0,
+    cacheReadTokens: 0,
+    requests: 0,
+    estimatedCents: 0,
+  };
+  table.config.budgetCents ??= config.tableBudgetCents;
+
+  return table;
+}
+
 export function loadTable(id: string): TableState | undefined {
   const row = requireDb().prepare('SELECT state FROM tables WHERE id = ?').get(id) as
     | { state: string }
     | undefined;
-  return row ? (JSON.parse(row.state) as TableState) : undefined;
+  return row ? hydrate(row.state) : undefined;
 }
 
 export function loadTableByJoinCode(joinCode: string): TableState | undefined {
   const row = requireDb()
     .prepare('SELECT state FROM tables WHERE join_code = ?')
     .get(joinCode.toUpperCase()) as { state: string } | undefined;
-  return row ? (JSON.parse(row.state) as TableState) : undefined;
+  return row ? hydrate(row.state) : undefined;
 }
 
 export interface TableSummaryRow {
