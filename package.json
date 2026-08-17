@@ -20,7 +20,7 @@
     "dev:server": "npm run dev -w @rpg/server",
     "dev:client": "npm run dev -w @rpg/client",
     "start": "node packages/server/dist/index.js",
-    "test": "npm run test -w @rpg/shared",
+    "test": "npm run test -w @rpg/shared && npm run test -w @rpg/server",
     "typecheck": "tsc -b packages/shared packages/server packages/client"
   },
   "devDependencies": {
